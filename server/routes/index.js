@@ -1,12 +1,21 @@
 /**
-* App routes definitions.
-*/
+ * App routes definitions.
+ */
 'use strict';
 
 let express = require('express');
 let router = express.Router();
+const authRoutes = require('./auth');
 
-// To confirm setup only.
-router.get('/', function(req, res) { return res.send('Hello world!'); });
+const { verifyToken } = require('../middlewares/auth');
+
+router.use('/auth', authRoutes);
+
+// The following routes are protected by the verifyToken middleware
+router.use(verifyToken);
+
+router.get('*', function (req, res) {
+  return res.sendStatus(404);
+});
 
 module.exports = router;
