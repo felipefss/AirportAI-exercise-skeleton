@@ -1,6 +1,6 @@
 function getUserRole(req, res, next) {
   const token = req.header('Authorization');
-  if (token === 'some-hash') {
+  if (token === 'Bearer some-hash') {
     req.userRole = 'admin';
   }
 
