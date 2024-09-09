@@ -1,14 +1,13 @@
 /**
-* Setup MongoDB.
-*/
+ * Setup MongoDB.
+ */
 'use strict';
 
 let mongoose = require('mongoose');
+const logger = console;
 const DATABASE_URL = 'mongodb://127.0.0.1:27017/AirportAI-exercise';
 
-
-module.exports = (async function() {
-
+module.exports = (async function () {
   const DATABASE_URL = process.env.DATABASE_URI;
 
   if (!DATABASE_URL) {
@@ -16,25 +15,25 @@ module.exports = (async function() {
   }
 
   // Mongoose events.
-  mongoose.connection.on('connected', function() {
+  mongoose.connection.on('connected', function () {
     logger.info('MongoDB', `Connected to database for env ${process.env.NODE_ENV}`);
   });
-  mongoose.connection.on('open', function() {
+  mongoose.connection.on('open', function () {
     logger.info('MongoDB', 'Connection opened');
   });
-  mongoose.connection.on('error', async function(err) {
+  mongoose.connection.on('error', async function (err) {
     logger.error('MongoDB', 'Connection error! Throwing error to restart application', err);
     // Throw error on mongoose error, so we restart the application.
     // eslint-disable-next-line promise/catch-or-return
     throw new Error('MongoDB disconnected');
   });
-  mongoose.connection.on('disconnected', function() {
+  mongoose.connection.on('disconnected', function () {
     logger.error('MongoDB', 'Disconnected, Reconnecting...');
   });
-  mongoose.connection.on('reconnected', function() {
+  mongoose.connection.on('reconnected', function () {
     logger.info('MongoDB', 'Reconnected');
   });
-  mongoose.connection.on('close', function() {
+  mongoose.connection.on('close', function () {
     logger.info('MongoDB', 'Closed');
   });
 
@@ -49,10 +48,9 @@ module.exports = (async function() {
     // Require models after connection.
     require('../models');
     return mongoose;
-  }
-  catch (error) {
+  } catch (error) {
     // To avoid promise not handled exception.
     logger.error('MongoDB', 'Unable to connect MongoDB. If problem persists, please restart the server', error);
     return null;
   }
-}());
+})();
