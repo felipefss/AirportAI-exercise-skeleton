@@ -6,6 +6,11 @@ async function createProduct(payload) {
   return await product.save();
 }
 
+async function getProducts() {
+  return await Product.find();
+}
+
 module.exports = {
   createProduct,
+  getProducts,
 };

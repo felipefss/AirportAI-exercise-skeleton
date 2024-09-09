@@ -3,7 +3,7 @@ let router = express.Router();
 const { z } = require('zod');
 
 const { denyUnauthorized } = require('../middlewares/auth');
-const { createProduct } = require('../controllers/products.controller');
+const { createProduct, getProducts } = require('../controllers/products.controller');
 
 router.use(denyUnauthorized);
 
@@ -25,13 +25,23 @@ router.post('/', async (req, res) => {
   // Create the product in the database.
   try {
     const createdProduct = await createProduct(product.data);
-    console.log('Product created:', createdProduct);
+    console.info('Product created:', createdProduct);
   } catch (error) {
     console.error(error);
     return res.sendStatus(500);
   }
 
   return res.sendStatus(201);
+});
+
+router.get('/', async (req, res) => {
+  try {
+    const products = await getProducts();
+    return res.send(products);
+  } catch (error) {
+    console.error(error);
+    return res.sendStatus(500);
+  }
 });
 
 module.exports = router;
