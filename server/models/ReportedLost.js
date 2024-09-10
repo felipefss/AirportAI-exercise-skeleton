@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-const reportedItemSchema = new Schema({
+const reportedLostSchema = new Schema({
   item: String,
   brand: String,
   model: String,
@@ -20,4 +20,4 @@ const reportedItemSchema = new Schema({
   },
 });
 
-module.exports = mongoose.model('ReportedItem', reportedItemSchema);
+module.exports = mongoose.model('ReportedLost', reportedLostSchema);

@@ -2,7 +2,16 @@ let express = require('express');
 let router = express.Router();
 
 const { denyUnauthorized } = require('../middlewares/auth');
-const { createProduct, getProducts, deleteProduct } = require('../controllers/products.controller');
+const { createProduct, getProducts, deleteProduct, reportLostProduct } = require('../controllers/products.controller');
+
+router.post('/report_lost', async (req, res) => {
+  try {
+    return await reportLostProduct(req, res);
+  } catch (error) {
+    console.error(error);
+    return res.sendStatus(500);
+  }
+});
 
 router.use(denyUnauthorized);
 

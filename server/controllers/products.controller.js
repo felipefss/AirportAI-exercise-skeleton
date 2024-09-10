@@ -51,8 +51,40 @@ async function deleteProduct(req, res) {
   return res.sendStatus(204);
 }
 
+async function reportLostProduct(req, res) {
+  const reportLostSchema = z
+    .object({
+      message: z.string(),
+      keywords: z.string().transform((value) => {
+        const keywords = value.split(',');
+
+        // Remove any whitespace from the keywords.
+        return keywords.map((keyword) => keyword.trim());
+      }),
+      lostTime: z.string().datetime(),
+    })
+    .partial({
+      keywords: true,
+      message: true,
+    })
+    .refine((data) => data.message || data.keywords, {
+      message: 'Either message or keywords must be provided',
+    });
+
+  const parsedPayload = reportLostSchema.safeParse(req.body);
+
+  if (!parsedPayload.success) {
+    return res.status(400).send(parsedPayload.error.formErrors);
+  }
+
+  console.log(parsedPayload.data);
+
+  return res.sendStatus(200);
+}
+
 module.exports = {
   createProduct,
   getProducts,
   deleteProduct,
+  reportLostProduct,
 };

@@ -19,7 +19,7 @@ const productSchema = new Schema({
   },
   reportedItem: {
     type: Schema.Types.ObjectId,
-    ref: 'ReportedItem',
+    ref: 'ReportedLost',
   },
 });
 
