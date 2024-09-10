@@ -10,7 +10,12 @@ async function getProducts() {
   return await Product.find();
 }
 
+async function deleteProduct(id) {
+  return await Product.findByIdAndDelete(id);
+}
+
 module.exports = {
   createProduct,
   getProducts,
+  deleteProduct,
 };

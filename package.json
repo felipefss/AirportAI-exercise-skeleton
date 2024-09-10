@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node app.js",
+    "dev": "node --env-file=.env --watch app.js",
     "test": "NODE_ENV=test mocha --recursive --inspect --exit test",
     "test-win": "set NODE_ENV=test&& mocha --recursive --inspect --exit test"
   },
