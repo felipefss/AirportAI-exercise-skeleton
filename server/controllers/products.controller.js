@@ -1,6 +1,22 @@
 const { z } = require('zod');
 
 const Product = require('../models/Product');
+const ReportedLost = require('../models/ReportedLost');
+const { parseKeywords, matchProductDescription } = require('../middlewares/ai');
+
+async function insertProductInDatabase(payload) {
+  const { item, brand, model, color, description } = payload;
+
+  const product = new Product({
+    ...payload,
+    item: item.toLowerCase(),
+    brand: brand?.toLowerCase(),
+    model: model?.toLowerCase(),
+    color: color?.toLowerCase(),
+    description,
+  });
+  return await product.save();
+}
 
 // TODO: consider when the product is created via a passenger reporting a lost item.
 async function createProduct(req, res) {
@@ -9,7 +25,9 @@ async function createProduct(req, res) {
     brand: z.string().optional(),
     model: z.string().optional(),
     color: z.string().optional(),
-    description: z.string(),
+    description: z.string().refine((value) => value.length > 0, {
+      message: 'Description must be provided',
+    }),
   });
 
   const parsedPayload = productSchema.safeParse(req.body);
@@ -19,14 +37,13 @@ async function createProduct(req, res) {
   }
 
   // Create the product in the database.
-  const product = new Product(parsedPayload.data);
-  const createdProduct = await product.save();
+  const createdProduct = await insertProductInDatabase(parsedPayload.data);
   console.info('Product created:', createdProduct);
   return res.sendStatus(201);
 }
 
 async function getProducts(_, res) {
-  const products = await Product.find();
+  const products = await Product.find().populate('reportedItem');
 
   return res.send(products);
 }
@@ -62,6 +79,7 @@ async function reportLostProduct(req, res) {
         return keywords.map((keyword) => keyword.trim());
       }),
       lostTime: z.string().datetime(),
+      email: z.string().email(),
     })
     .partial({
       keywords: true,
@@ -77,9 +95,54 @@ async function reportLostProduct(req, res) {
     return res.status(400).send(parsedPayload.error.formErrors);
   }
 
-  console.log(parsedPayload.data);
+  const { keywords, email, lostTime } = parsedPayload.data;
 
-  return res.sendStatus(200);
+  // TODO: make concurrent promises to save reported lost and find a matching product
+  const reportedLost = new ReportedLost({
+    keywords,
+    reportedBy: email,
+    lostTime,
+  });
+  await reportedLost.save();
+
+  const { item, brand, model, color, description } = await parseKeywords(keywords.join(','));
+
+  // TODO: search the item by only the populated fields
+  const matchingProducts = await Product.find({
+    item: item.toLowerCase(),
+    $or: [{ brand: brand?.toLowerCase() }, { model: model?.toLowerCase() }, { color: color?.toLowerCase() }],
+  });
+
+  if (matchingProducts.length > 1) {
+    // Multiple matches, try to refine the search by description.
+    const matchingProductIndex = await matchProductDescription(
+      description,
+      matchingProducts.map((product) => product.description)
+    );
+
+    if (matchingProductIndex !== -1) {
+      // If a match is found, update the product with the reported item.
+      const product = matchingProducts[matchingProductIndex];
+      product.reportedItem = reportedLost._id;
+      await product.save();
+
+      return res.sendStatus(201);
+    }
+  }
+
+  if (matchingProducts.length === 1) {
+    // Single match, update the product with the reported item.
+    const [product] = matchingProducts;
+    product.reportedItem = reportedLost._id;
+    await product.save();
+
+    return res.sendStatus(201);
+  }
+
+  // No matches, create a new product.
+  await insertProductInDatabase({ item, brand, model, color, description, reportedItem: reportedLost._id });
+
+  return res.sendStatus(201);
 }
 
 module.exports = {
