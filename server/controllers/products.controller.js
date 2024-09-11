@@ -17,7 +17,6 @@ async function insertProductInDatabase(payload) {
   return await product.save();
 }
 
-// TODO: consider when the product is created via a passenger reporting a lost item.
 async function createProduct(req, res) {
   const productSchema = z.object({
     type: z.string(),
@@ -96,7 +95,6 @@ async function reportLostProduct(req, res) {
 
   const { keywords, email, lostTime } = parsedPayload.data;
 
-  // TODO: make concurrent promises to save reported lost and find a matching product
   const reportedLost = new ReportedLost({
     keywords,
     reportedBy: email,
