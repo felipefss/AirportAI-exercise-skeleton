@@ -5,15 +5,14 @@ const ReportedLost = require('../models/ReportedLost');
 const { parseKeywords, matchProductDescription } = require('../middlewares/ai');
 
 async function insertProductInDatabase(payload) {
-  const { item, brand, model, color, description } = payload;
+  const { type, brand, model, color } = payload;
 
   const product = new Product({
     ...payload,
-    item: item.toLowerCase(),
+    type: type.toLowerCase(),
     brand: brand?.toLowerCase(),
     model: model?.toLowerCase(),
     color: color?.toLowerCase(),
-    description,
   });
   return await product.save();
 }
@@ -21,7 +20,7 @@ async function insertProductInDatabase(payload) {
 // TODO: consider when the product is created via a passenger reporting a lost item.
 async function createProduct(req, res) {
   const productSchema = z.object({
-    item: z.string(),
+    type: z.string(),
     brand: z.string().optional(),
     model: z.string().optional(),
     color: z.string().optional(),
@@ -105,28 +104,36 @@ async function reportLostProduct(req, res) {
   });
   await reportedLost.save();
 
-  const { item, brand, model, color, description } = await parseKeywords(keywords.join(','));
+  const parsedFields = await parseKeywords(keywords.join(','));
 
-  // TODO: search the item by only the populated fields
-  const matchingProducts = await Product.find({
-    item: item.toLowerCase(),
-    $or: [{ brand: brand?.toLowerCase() }, { model: model?.toLowerCase() }, { color: color?.toLowerCase() }],
-  });
+  const nonEmptyFields = Object.entries({ ...parsedFields, description: undefined }).reduce((output, [key, value]) => {
+    if (value != null) {
+      output[key] = value.toLowerCase();
+    }
+
+    return output;
+  }, {});
+
+  const matchingProducts = await Product.find({ ...nonEmptyFields });
 
   if (matchingProducts.length > 1) {
     // Multiple matches, try to refine the search by description.
-    const matchingProductIndex = await matchProductDescription(
-      description,
+    const { match_index: matchingProductIndex } = await matchProductDescription(
+      parsedFields.description,
       matchingProducts.map((product) => product.description)
     );
 
     if (matchingProductIndex !== -1) {
       // If a match is found, update the product with the reported item.
       const product = matchingProducts[matchingProductIndex];
-      product.reportedItem = reportedLost._id;
-      await product.save();
 
-      return res.sendStatus(201);
+      // If the product already has a reported item, do not update it. Instead, create a new product.
+      if (!('reportedItem' in product)) {
+        product.reportedItem = reportedLost._id;
+        await product.save();
+
+        return res.sendStatus(201);
+      }
     }
   }
 
@@ -140,7 +147,7 @@ async function reportLostProduct(req, res) {
   }
 
   // No matches, create a new product.
-  await insertProductInDatabase({ item, brand, model, color, description, reportedItem: reportedLost._id });
+  await insertProductInDatabase({ ...parsedFields, reportedItem: reportedLost._id });
 
   return res.sendStatus(201);
 }
