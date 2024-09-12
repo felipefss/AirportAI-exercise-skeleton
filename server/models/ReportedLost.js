@@ -12,6 +12,11 @@ const reportedLostSchema = new Schema({
     type: String,
     required: true,
   },
+  reportedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  deletedAt: Date,
 });
 
 module.exports = mongoose.model('ReportedLost', reportedLostSchema);

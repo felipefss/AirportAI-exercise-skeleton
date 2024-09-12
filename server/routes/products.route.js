@@ -2,7 +2,13 @@ let express = require('express');
 let router = express.Router();
 
 const { denyUnauthorized } = require('../middlewares/auth');
-const { createProduct, getProducts, deleteProduct, reportLostProduct } = require('../controllers/products.controller');
+const {
+  createProduct,
+  getProducts,
+  deleteProduct,
+  reportLostProduct,
+  removeReportedItemFromProduct,
+} = require('../controllers/products.controller');
 
 router.post('/report_lost', async (req, res) => {
   try {
@@ -14,6 +20,15 @@ router.post('/report_lost', async (req, res) => {
 });
 
 router.use(denyUnauthorized);
+
+router.patch('/:id', async (req, res) => {
+  try {
+    return await removeReportedItemFromProduct(req, res);
+  } catch (error) {
+    console.error(error);
+    return res.sendStatus(500);
+  }
+});
 
 router.post('/', async (req, res) => {
   try {

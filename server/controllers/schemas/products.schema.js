@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { deleteProduct } = require('../products.controller');
 
 const productSchema = z.object({
   type: z.string(),
@@ -38,7 +39,16 @@ function parseReportLostSchema(payload) {
   return reportLostSchema.safeParse(payload);
 }
 
+const onlyIdSchema = z.object({
+  id: z.string(),
+});
+
+function parseProductIdSchema(params) {
+  return onlyIdSchema.safeParse(params);
+}
+
 module.exports = {
   productSchema: parseProductSchema,
   reportLostSchema: parseReportLostSchema,
+  productIdSchema: parseProductIdSchema,
 };

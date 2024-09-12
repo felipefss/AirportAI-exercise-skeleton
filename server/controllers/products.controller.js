@@ -4,7 +4,7 @@ const Product = require('../models/Product');
 const ReportedLost = require('../models/ReportedLost');
 const { parseKeywords, matchProductDescription, parseUserMessage } = require('../middlewares/ai');
 
-const { productSchema, reportLostSchema } = require('./schemas/products.schema');
+const { productSchema, reportLostSchema, productIdSchema } = require('./schemas/products.schema');
 
 async function insertProductInDatabase(payload) {
   const { type, brand, model, color } = payload;
@@ -42,11 +42,7 @@ async function getProducts(_, res) {
 }
 
 async function deleteProduct(req, res) {
-  const deleteSchema = z.object({
-    id: z.string(),
-  });
-
-  const parsedParams = deleteSchema.safeParse(req.params);
+  const parsedParams = productIdSchema(req.params);
 
   if (!parsedParams.success) {
     return res.status(400).send(parsedParams.error.flatten().fieldErrors);
@@ -138,9 +134,36 @@ async function reportLostProduct(req, res) {
   return res.sendStatus(200);
 }
 
+async function removeReportedItemFromProduct(req, res) {
+  const parsedParams = productIdSchema(req.params);
+
+  if (!parsedParams.success) {
+    return res.status(400).send(parsedParams.error.flatten().fieldErrors);
+  }
+
+  const productId = parsedParams.data.id;
+  const product = await Product.findById(productId);
+
+  if (!product) {
+    return res.sendStatus(404);
+  }
+
+  const softDeleteReport = ReportedLost.findByIdAndUpdate(product.reportedItem, {
+    deletedAt: new Date(),
+  });
+
+  product.reportedItem = undefined;
+  const saveProduct = product.save();
+
+  await Promise.all([softDeleteReport, saveProduct]);
+
+  return res.sendStatus(204);
+}
+
 module.exports = {
   createProduct,
   getProducts,
   deleteProduct,
   reportLostProduct,
+  removeReportedItemFromProduct,
 };
