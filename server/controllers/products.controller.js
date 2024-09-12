@@ -2,7 +2,9 @@ const { z } = require('zod');
 
 const Product = require('../models/Product');
 const ReportedLost = require('../models/ReportedLost');
-const { parseKeywords, matchProductDescription } = require('../middlewares/ai');
+const { parseKeywords, matchProductDescription, parseUserMessage } = require('../middlewares/ai');
+
+const { productSchema, reportLostSchema } = require('./schemas/products.schema');
 
 async function insertProductInDatabase(payload) {
   const { type, brand, model, color } = payload;
@@ -18,18 +20,9 @@ async function insertProductInDatabase(payload) {
 }
 
 async function createProduct(req, res) {
-  const productSchema = z.object({
-    type: z.string(),
-    brand: z.string().optional(),
-    model: z.string().optional(),
-    color: z.string().optional(),
-    description: z.string().refine((value) => value.length > 0, {
-      message: 'Description must be provided',
-    }),
-  });
+  const parsedPayload = productSchema(req.body);
 
-  const parsedPayload = productSchema.safeParse(req.body);
-
+  // Validate the product schema.
   if (!parsedPayload.success) {
     return res.status(400).send(parsedPayload.error.flatten().fieldErrors);
   }
@@ -67,42 +60,28 @@ async function deleteProduct(req, res) {
 }
 
 async function reportLostProduct(req, res) {
-  const reportLostSchema = z
-    .object({
-      message: z.string(),
-      keywords: z.string().transform((value) => {
-        const keywords = value.split(',');
-
-        // Remove any whitespace from the keywords.
-        return keywords.map((keyword) => keyword.trim());
-      }),
-      lostTime: z.string().datetime(),
-      email: z.string().email(),
-    })
-    .partial({
-      keywords: true,
-      message: true,
-    })
-    .refine((data) => data.message || data.keywords, {
-      message: 'Either message or keywords must be provided',
-    });
-
-  const parsedPayload = reportLostSchema.safeParse(req.body);
+  const parsedPayload = reportLostSchema(req.body);
 
   if (!parsedPayload.success) {
     return res.status(400).send(parsedPayload.error.formErrors);
   }
 
-  const { keywords, email, lostTime } = parsedPayload.data;
+  const { keywords, email, lostTime, message } = parsedPayload.data;
 
   const reportedLost = new ReportedLost({
+    message,
     keywords,
     reportedBy: email,
     lostTime,
   });
   await reportedLost.save();
 
-  const parsedFields = await parseKeywords(keywords.join(','));
+  let parsedFields;
+  if (message) {
+    parsedFields = await parseUserMessage(message);
+  } else if (keywords) {
+    parsedFields = await parseKeywords(keywords.join(','));
+  }
 
   const nonEmptyFields = Object.entries({ ...parsedFields, description: undefined }).reduce((output, [key, value]) => {
     if (value != null) {
@@ -126,11 +105,11 @@ async function reportLostProduct(req, res) {
       const product = matchingProducts[matchingProductIndex];
 
       // If the product already has a reported item, do not update it. Instead, create a new product.
-      if (!('reportedItem' in product)) {
+      if (!product.reportedItem) {
         product.reportedItem = reportedLost._id;
         await product.save();
 
-        return res.sendStatus(201);
+        return res.sendStatus(200);
       }
     }
   }
@@ -141,13 +120,17 @@ async function reportLostProduct(req, res) {
     product.reportedItem = reportedLost._id;
     await product.save();
 
-    return res.sendStatus(201);
+    return res.sendStatus(200);
   }
 
   // No matches, create a new product.
-  await insertProductInDatabase({ ...parsedFields, reportedItem: reportedLost._id });
+  await insertProductInDatabase({
+    ...parsedFields,
+    reportedItem: reportedLost._id,
+    description: parsedFields.description ?? 'reported lost by user',
+  });
 
-  return res.sendStatus(201);
+  return res.sendStatus(200);
 }
 
 module.exports = {
