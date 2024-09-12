@@ -17,6 +17,7 @@ const productSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  deletedAt: Date,
   reportedItem: {
     type: Schema.Types.ObjectId,
     ref: 'ReportedLost',

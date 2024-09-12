@@ -34,7 +34,9 @@ async function createProduct(req, res) {
 }
 
 async function getProducts(_, res) {
-  const products = await Product.find().populate('reportedItem');
+  const products = await Product.find({
+    deletedAt: { $exists: false },
+  }).populate('reportedItem');
 
   return res.send(products);
 }
@@ -50,11 +52,14 @@ async function deleteProduct(req, res) {
     return res.status(400).send(parsedParams.error.flatten().fieldErrors);
   }
 
-  const deletedProduct = await Product.findByIdAndDelete(parsedParams.data.id);
+  const product = await Product.findById(parsedParams.data.id);
 
-  if (!deletedProduct) {
+  if (!product) {
     return res.sendStatus(404);
   }
+
+  product.deletedAt = new Date();
+  await product.save();
 
   return res.sendStatus(204);
 }
@@ -91,7 +96,7 @@ async function reportLostProduct(req, res) {
     return output;
   }, {});
 
-  const matchingProducts = await Product.find({ ...nonEmptyFields });
+  const matchingProducts = await Product.find({ ...nonEmptyFields, deletedAt: { $exists: false } });
 
   if (matchingProducts.length > 1) {
     // Multiple matches, try to refine the search by description.
