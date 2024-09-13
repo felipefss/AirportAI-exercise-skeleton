@@ -3,6 +3,8 @@
  */
 'use strict';
 
+require('dotenv').config();
+
 let app = require('express')();
 const PORT = 3000;
 
